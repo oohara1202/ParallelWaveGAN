@@ -1,4 +1,4 @@
-# STUDIES
+# STUDIES-Teacher
 
 ```bash
 ./run.sh --conf conf/hifigan.v1.yaml

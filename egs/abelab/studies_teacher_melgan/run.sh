@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2019 Tomoki Hayashi
+# Copyright 2020 Tomoki Hayashi
 #  MIT License (https://opensource.org/licenses/MIT)
 
 . ./cmd.sh || exit 1;
@@ -17,13 +17,28 @@ n_jobs=16      # number of parallel jobs in feature extraction
 conf=conf/parallel_wavegan.v1.yaml
 
 # directory path setting
-db_root=/abelab/DB4/JNAS # database direcotry
-dumpdir=dump           # directory to dump features
+db_root=/path/to/database # direcotry including wavfiles (MODIFY BY YOURSELF)
+                          # each wav filename in the directory should be unique
+                          # e.g.
+                          # /path/to/database
+                          # ├── utt_1.wav
+                          # ├── utt_2.wav
+                          # │   ...
+                          # └── utt_N.wav
+dumpdir=dump # directory to dump features
+
+# subset setting
+shuffle=false # whether to shuffle the data to create subset
+num_dev=100   # the number of development data
+num_eval=100  # the number of evaluation data
+              # (if set to 0, the same dev set is used as eval set)
 
 # training related setting
 tag=""     # tag for directory to save model
 resume=""  # checkpoint path to resume training
            # (e.g. <path>/<to>/checkpoint-10000steps.pkl)
+pretrain="" # checkpoint path to load pretrained parameters
+            # (e.g. ../../jsut/<path>/<to>/checkpoint-400000steps.pkl)
 
 # decoding related setting
 checkpoint="" # checkpoint path to be used for decoding
@@ -41,11 +56,16 @@ set -euo pipefail
 
 if [ "${stage}" -le 0 ] && [ "${stop_stage}" -ge 0 ]; then
     echo "Stage 0: Data preparation"
-    local/data_prep.sh \
-        --train_set "${train_set}" \
-        --dev_set "${dev_set}" \
-        --eval_set "${eval_set}" \
-        "${db_root}" data conf/train_speakers.txt
+    # local/data_prep.sh \
+    #     --fs "$(yq ".sampling_rate" "${conf}")" \
+    #     --num_dev "${num_dev}" \
+    #     --num_eval "${num_eval}" \
+    #     --train_set "${train_set}" \
+    #     --dev_set "${dev_set}" \
+    #     --eval_set "${eval_set}" \
+    #     --shuffle "${shuffle}" \
+    #     "${db_root}" data
+    eval python local/make_data_dir.py
 fi
 
 stats_ext=$(grep -q "hdf5" <(yq ".format" "${conf}") && echo "h5" || echo "npy")
@@ -62,6 +82,7 @@ if [ "${stage}" -le 1 ] && [ "${stop_stage}" -ge 1 ]; then
             parallel-wavegan-preprocess \
                 --config "${conf}" \
                 --scp "${dumpdir}/${name}/raw/wav.JOB.scp" \
+                --segments "${dumpdir}/${name}/raw/segments.JOB" \
                 --dumpdir "${dumpdir}/${name}/raw/dump.JOB" \
                 --verbose "${verbose}"
         echo "Successfully finished feature extraction of ${name} set."
@@ -73,14 +94,20 @@ if [ "${stage}" -le 1 ] && [ "${stop_stage}" -ge 1 ]; then
     echo "Successfully finished feature extraction."
 
     # calculate statistics for normalization
-    echo "Statistics computation start. See the progress via ${dumpdir}/${train_set}/compute_statistics.log."
-    ${train_cmd} "${dumpdir}/${train_set}/compute_statistics.log" \
-        parallel-wavegan-compute-statistics \
-            --config "${conf}" \
-            --rootdir "${dumpdir}/${train_set}/raw" \
-            --dumpdir "${dumpdir}/${train_set}" \
-            --verbose "${verbose}"
-    echo "Successfully finished calculation of statistics."
+    if [ -z "${pretrain}" ]; then
+        # calculate statistics for normalization
+        echo "Statistics computation start. See the progress via ${dumpdir}/${train_set}/compute_statistics.log."
+        ${train_cmd} "${dumpdir}/${train_set}/compute_statistics.log" \
+            parallel-wavegan-compute-statistics \
+                --config "${conf}" \
+                --rootdir "${dumpdir}/${train_set}/raw" \
+                --dumpdir "${dumpdir}/${train_set}" \
+                --verbose "${verbose}"
+        echo "Successfully finished calculation of statistics."
+    else
+        echo "Use statistics of pretrained model. Skip statistics computation."
+        cp "$(dirname "${pretrain}")/stats.${stats_ext}" "${dumpdir}/${train_set}"
+    fi
 
     # normalize and dump them
     pids=()
@@ -105,9 +132,13 @@ if [ "${stage}" -le 1 ] && [ "${stop_stage}" -ge 1 ]; then
 fi
 
 if [ -z "${tag}" ]; then
-    expdir="exp/${train_set}_jnas_$(basename "${conf}" .yaml)"
+    expdir="exp/${train_set}_$(basename "${conf}" .yaml)"
+    if [ -n "${pretrain}" ]; then
+        pretrain_tag=$(basename "$(dirname "${pretrain}")")
+        expdir+="_${pretrain_tag}"
+    fi
 else
-    expdir="exp/${train_set}_jnas_${tag}"
+    expdir="exp/${train_set}_${tag}"
 fi
 if [ "${stage}" -le 2 ] && [ "${stop_stage}" -ge 2 ]; then
     echo "Stage 2: Network training"
@@ -126,6 +157,7 @@ if [ "${stage}" -le 2 ] && [ "${stop_stage}" -ge 2 ]; then
             --dev-dumpdir "${dumpdir}/${dev_set}/norm" \
             --outdir "${expdir}" \
             --resume "${resume}" \
+            --pretrain "${pretrain}" \
             --verbose "${verbose}"
     echo "Successfully finished training."
 fi

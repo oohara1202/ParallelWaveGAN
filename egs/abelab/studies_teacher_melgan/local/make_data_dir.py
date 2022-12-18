@@ -4,7 +4,7 @@ from pathlib import Path
 
 
 
-db_root = '/work/abelab4/s_koha/work/dataset/STUDIES_reconst/Teacher'
+db_root = '/work/abelab4/s_koha/work/dataset/STUDIES_22k_reconst/Teacher'
 base_dir = 'data'
 
 train_types = ['train_nodev', 'dev', 'eval']
@@ -29,7 +29,7 @@ for train_type, dir_type in zip(train_types, dir_types):
             basename = os.path.splitext(os.path.basename(wav_file))[0]
             basename = basename.split('-', 1)
             basename = '_'.join(basename)
-            s = 'teacher{} cat {} | sox -t wav - -c 1 -b 16 -t wav - rate 22050 |\n'.format(basename, wav_file)
+            s = 'teacher{} {}\n'.format(basename, wav_file)
             f.write(s)
 
     # segmentsのコピー
