@@ -65,7 +65,7 @@ if [ "${stage}" -le 0 ] && [ "${stop_stage}" -ge 0 ]; then
     #     --eval_set "${eval_set}" \
     #     --shuffle "${shuffle}" \
     #     "${db_root}" data
-    eval python local/make_data_dir.py
+    python local/make_data.py
 fi
 
 stats_ext=$(grep -q "hdf5" <(yq ".format" "${conf}") && echo "h5" || echo "npy")

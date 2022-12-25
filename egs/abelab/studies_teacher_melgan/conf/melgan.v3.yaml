@@ -26,7 +26,7 @@ trim_silence: true       # Whether to trim the start and end of silence.
 trim_threshold_in_db: 60 # Need to tune carefully if the recording is not good.
 trim_frame_size: 2048    # Frame size in trimming.
 trim_hop_size: 512       # Hop size in trimming.
-format: "hdf5"           # Feature file format. "npy" or "hdf5" is supported.
+format: "npy"           # Feature file format. "npy" or "hdf5" is supported.
 
 ###########################################################
 #         GENERATOR NETWORK ARCHITECTURE SETTING          #
@@ -118,10 +118,10 @@ discriminator_grad_norm: 1 # Discriminator's gradient norm.
 #                    INTERVAL SETTING                     #
 ###########################################################
 discriminator_train_start_steps: 100000 # Number of steps to start to train discriminator.
-train_max_steps: 2000000                # Number of training steps.
-save_interval_steps: 5000               # Interval steps to save checkpoint.
+train_max_steps: 2500000                # Number of training steps.
+save_interval_steps: 500000             # Interval steps to save checkpoint.
 eval_interval_steps: 1000               # Interval steps to evaluate the network.
-log_interval_steps: 100                 # Interval steps to record the training log.
+log_interval_steps: 10000                # Interval steps to record the training log.
 
 ###########################################################
 #                     OTHER SETTING                       #
